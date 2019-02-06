@@ -123,18 +123,18 @@ public:
   uint8_t available();
   uint8_t receive();
   uint8_t ping(uint8_t);  // ADDED: Simply send a write request to the device without any additional bytes. This is sometimes used to trigger a device.
-  uint8_t write(uint8_t, uint8_t);
-  uint8_t write(int, int);
-  uint8_t write(uint8_t, uint8_t, uint8_t);
-  uint8_t write(int, int, int);
-  uint8_t write(uint8_t, uint8_t, char*);
-  uint8_t write(uint8_t, uint8_t, uint8_t*, uint8_t);
-  uint8_t read(uint8_t, uint8_t);
-  uint8_t read(int, int);
-  uint8_t read(uint8_t, uint8_t, uint8_t);
-  uint8_t read(int, int, int);
-  uint8_t read(uint8_t, uint8_t, uint8_t*);
-  uint8_t read(uint8_t, uint8_t, uint8_t, uint8_t*);
+  uint8_t write(uint8_t address, uint8_t registerAddress);
+  uint8_t write(int address, int registerAddress);
+  uint8_t write(uint8_t address, uint8_t registerAddress, uint8_t data);
+  uint8_t write(int address, int registerAddress, int data);
+  uint8_t write(uint8_t address, uint8_t registerAddress, char *data);
+  uint8_t write(uint8_t address, uint8_t registerAddress, uint8_t *data, uint8_t numberBytes);
+  uint8_t read(uint8_t address, uint8_t numberBytes);
+  uint8_t read(int address, int numberBytes);
+  uint8_t read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes);
+  uint8_t read(int address, int registerAddress, int numberBytes);
+  uint8_t read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer);
+  uint8_t read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes, uint8_t *dataBuffer);
 
 
 private:
