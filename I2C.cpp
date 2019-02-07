@@ -52,7 +52,7 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-Modified by Soon Kiat Lau (2017) for:
+Modified by Soon Kiat Lau (2019) for:
 - ping function
 - error codes
 - allow user to enable/disable internal pull-up resistors in begin()
@@ -127,15 +127,15 @@ void I2C::end()
   TWCR = 0;
 }
 
-void I2C::timeOut(uint16_t _timeOut)
+void I2C::setTimeOut(uint16_t timeOut)
 {
-  timeOutDelay = _timeOut;
+  timeOutDelay = timeOut;
 }
 
 // Call setSpeed AFTER begin(), because begin() sets speed to 100 kHz
-void I2C::setSpeed(uint8_t _fast)
+void I2C::setSpeed(bool useFastMode)
 {
-  if (!_fast)
+  if (!useFastMode)
   {
     // 100 kHz
     TWBR = ((F_CPU / 100000) - 16) / 2;
@@ -147,7 +147,7 @@ void I2C::setSpeed(uint8_t _fast)
   }
 }
 
-void I2C::pullup(uint8_t activate)
+void I2C::pullup(bool activate)
 {
   if (activate)
   {
@@ -182,7 +182,7 @@ void I2C::pullup(uint8_t activate)
 void I2C::scan()
 {
   uint16_t tempTime = timeOutDelay;
-  timeOut(80);
+  setTimeOut(80);
   uint8_t totalDevicesFound = 0;
   Serial.println("Scanning for devices...please wait");
   Serial.println();

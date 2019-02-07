@@ -52,7 +52,7 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-Modified by Soon Kiat Lau (2017) for:
+Modified by Soon Kiat Lau (2019) for:
 - ping function
 - error codes
 - allow user to enable/disable internal pull-up resistors in begin()
@@ -120,13 +120,27 @@ public:
   I2C();
   void begin(bool enableInternalPullUps);
   void end();
-  void timeOut(uint16_t);
-  void setSpeed(uint8_t);
-  void pullup(uint8_t);
+  void setTimeOut(uint16_t timeOut);
+  void setSpeed(bool useFastMode);
+  void pullup(bool activate);
   void scan();
   uint8_t available();
   uint8_t receive();
-  I2C_STATUS ping(uint8_t);  // ADDED: Simply send a write request to the device without any additional bytes. This is sometimes used to trigger a device.
+
+  // This function simply sends a write request to the addressed device without any additional bytes. This is sometimes used to trigger a device.
+  I2C_STATUS ping(uint8_t address);
+
+  // The following are the write and read functions. The "registerAddress" is there to follow the expected I2C standard, whereby immediately after a write/read
+  // command byte, the master is expected to specify which register should be written on/read from. However, there are many devices that do not follow this
+  // standard strictly, and sometimes a "command" is sent instead of the address of the register. Luckily, the "registerAddress" variable is simply a byte
+  // that is sent out right after the write/read byte, therefore it can be replaced with any byte such as a command byte or whatever your device needs to send
+  // immediately after the write/read byte. The "data" is simply the third byte in the whole command train. Any additional bytes can be stuffed into an array
+  // and sent out with the function using *data.
+  //
+  // This is how the entire command train looks like:
+  // [address+read/write byte] -> ["registerAddress" byte] -> [data (if available) OR *data (sends out one byte for each array entry)]
+  //
+  //
   I2C_STATUS write(uint8_t address, uint8_t registerAddress);
   I2C_STATUS write(int address, int registerAddress);
   I2C_STATUS write(uint8_t address, uint8_t registerAddress, uint8_t data);
