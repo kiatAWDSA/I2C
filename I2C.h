@@ -85,8 +85,6 @@ Modified by Soon Kiat Lau (2019) for:
 #define MR_DATA_NACK    0x58
 #define LOST_ARBTRTN    0x38
 #define TWI_STATUS      (TWSR & 0xF8)
-#define TWI_STATUS_ACK      0x00  // I2C comm completed successfully (received ACK bit)
-#define TWI_STATUS_TIMEOUT  0x01  // I2C comm failed because it took too long to receive a complete response
 #define SLA_W(address)  (address << 1)
 #define SLA_R(address)  ((address << 1) + 0x01)
 #define cbi(sfr, bit)   (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -97,22 +95,31 @@ Modified by Soon Kiat Lau (2019) for:
 // Error codes returned by read/write functions
 typedef enum
 {
-  // Errors categorized according to the functions that return them. Commented-out errors are still returned
-  // by that function, but is already defined in the list.
-
-  // Errors returned from the custom I2C library
-  I2C_STATUS_OK               = 0,   // No problemo
-  I2C_STATUS_START            = 1,   // I2C timeout while waiting for successful completion of a Start bit
-  I2C_STATUS_ACKNACK_TRS_ADD  = 2,   // I2C timeout while waiting for ACK/NACK while addressing slave in transmit mode (MT)
-  I2C_STATUS_ACKNACK_TRS_DAT  = 3,   // I2C timeout while waiting for ACK/NACK while sending data to the slave
-  I2C_STATUS_REPSTART         = 4,   // I2C timeout while waiting for successful completion of a Repeated Start
-  I2C_STATUS_ACKNACK_REC_ADD  = 5,   // I2C timeout while waiting for ACK/NACK while addressing slave in receiver mode (MR)
-  I2C_STATUS_ACKNACK_REC_DAT  = 6,   // I2C timeout while waiting for ACK/NACK while receiving data from the slave
-  I2C_STATUS_STOP             = 7,   // I2C timeout while waiting for successful completion of the Stop bit
-  I2C_STATUS_UNKNOWN          = 8,   // Unknown or yet to be defined error
-
-  // Internal use by this library only; do not use this outside of the library
+  I2C_STATUS_OK               = 0,  // No problemo
+  I2C_STATUS_START_TIMEOUT    = 1,  // I2C timeout while attempting to start comm on the I2C bus
+  I2C_STATUS_REPSTART_TIMEOUT = 2,  // I2C timeout while attempting to perform a repeated start comm on the I2C bus
+  I2C_STATUS_ADDRESS_TIMEOUT  = 3,  // I2C timeout while waiting for an ACK/NACK bit after sending out the address byte. This could indicate no devices have the address, or the targeted device somehow did not interpret the signals correctly.
+  I2C_STATUS_ADDRESS_NACK     = 4,  // A NACK bit was received after sending out the address byte. Some devices do this to indicate they are busy or not ready for communication.
+  I2C_STATUS_TRS_DAT_ACKNACK  = 5,  // I2C timeout while waiting for ACK/NACK while sending data to the slave
+  I2C_STATUS_REC_DAT_ACKNACK  = 6,  // I2C timeout while waiting for ACK/NACK while receiving data from the slave
+  I2C_STATUS_STOP_TIMEOUT     = 7,  // I2C timeout while attempting to stop comm on the I2C bus
+  I2C_STATUS_ACK_UNRECEIVED   = 8,  // An ACK bit was not received even though we were expecting one
+  I2C_STATUS_NACK_UNRECEIVED  = 9,  // A NACK bit was not received even though we were expecting one
+  I2C_STATUS_UNKNOWN          = 99  // Unknown or yet to be defined error
 } I2C_STATUS;
+
+
+// Status of the I2C communication, as read from the TWSR register
+typedef enum
+{
+  TWSR_STATUS_STARTED     = 0,  // I2C comm successfully started
+  TWSR_STATUS_STOPPED     = 0,  // I2C comm successfully stopped
+  TWSR_STATUS_ACK         = 0,  // I2C comm completed with an ACK bit
+  TWSR_STATUS_TIMEOUT     = 1,  // I2C comm failed because it took too long to receive a complete response
+  TWSR_STATUS_NACK        = 2,  // I2C comm completed with a NACK bit
+  TWSR_STATUS_LOSTARB     = 3,  // The arbitration of the I2C bus has failed, and the bus will be reset. See https://www.i2c-bus.org/i2c-primer/analysing-obscure-problems/master-reports-arbitration-lost/ or https://community.nxp.com/thread/348665
+  TWSR_STATUS_UNKNOWN     = 99  // An unknown condition was seen on the TSWR register
+} TWSR_STATUS;
 
 class I2C
 {
@@ -147,11 +154,15 @@ public:
   I2C_STATUS write(int address, int registerAddress, int data);
   I2C_STATUS write(uint8_t address, uint8_t registerAddress, char *data);
   I2C_STATUS write(uint8_t address, uint8_t registerAddress, uint8_t *data, uint8_t numberBytes);
+
+  // These read functions send out the address byte with a read bit, and get the incoming data.
   I2C_STATUS read(uint8_t address, uint8_t numberBytes);
   I2C_STATUS read(int address, int numberBytes);
+  I2C_STATUS read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer);
+
+  // These read functions first write onto a register on the target device, then utilize repeated start to begin obtaining incoming data.
   I2C_STATUS read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes);
   I2C_STATUS read(int address, int registerAddress, int numberBytes);
-  I2C_STATUS read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer);
   I2C_STATUS read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes, uint8_t *dataBuffer);
 
 
@@ -161,7 +172,7 @@ private:
   uint8_t sendByte(uint8_t);
   uint8_t receiveByte(uint8_t);
   uint8_t stop();
-  void lockUp();
+  void resetI2CBus();
   uint8_t returnStatus;
   uint8_t nack;
   uint8_t data[MAX_BUFFER_SIZE];
@@ -169,7 +180,6 @@ private:
   static uint8_t bufferIndex;
   static uint8_t totalBytes;
   static uint16_t timeOutDelay;
-
 };
 
 extern I2C I2c;

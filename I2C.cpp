@@ -190,14 +190,15 @@ void I2C::scan()
   {
     returnStatus = 0;
     returnStatus = start();
-    if (!returnStatus)
+    if (TWSR_STATUS_STARTED)
     {
       returnStatus = sendAddress(SLA_W(s));
     }
-    if (returnStatus)
+    if (returnStatus != TWSR_STATUS_STARTED || returnStatus != TWSR_STATUS_ACK)
     {
-      if (returnStatus == TWI_STATUS_TIMEOUT)
-      {
+      if (returnStatus != TWSR_STATUS_NACK)
+      {// Will receive a NACK if a device has the address, but is unable to communicate now. So that is not a problem with the bus.
+        // Other errors indicate there is a problem with the bus.
         Serial.println("There is a problem with the bus, could not complete scan");
         timeOutDelay = tempTime;
         return;
@@ -228,7 +229,7 @@ uint8_t I2C::receive()
   if (!bytesAvailable)
   {
     bufferIndex = 0;
-    return(TWI_STATUS_ACK);
+    return(0);
   }
   bytesAvailable--;
   return(data[bufferIndex]);
@@ -264,18 +265,19 @@ I2C_STATUS I2C::ping(uint8_t address)
 {
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
 
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -285,23 +287,24 @@ I2C_STATUS I2C::write(uint8_t address, uint8_t registerAddress)
 {
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(registerAddress);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -316,29 +319,30 @@ I2C_STATUS I2C::write(uint8_t address, uint8_t registerAddress, uint8_t data)
 {
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(registerAddress);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(data);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -359,32 +363,33 @@ I2C_STATUS I2C::write(uint8_t address, uint8_t registerAddress, uint8_t *data, u
 {
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(registerAddress);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   for (uint8_t i = 0; i < numberBytes; i++)
   {
     returnStatus = sendByte(data[i]);
-    if (returnStatus)
+    if (returnStatus != TWSR_STATUS_ACK)
     {
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
       else { return(I2C_STATUS_UNKNOWN); }
     }
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -403,11 +408,55 @@ I2C_STATUS I2C::read(uint8_t address, uint8_t numberBytes)
   nack = numberBytes - 1;
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_R(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
+    else { return(I2C_STATUS_UNKNOWN); }
+  }
+  for (uint8_t i = 0; i < numberBytes; i++)
+  {
+    if (i == nack)
+    {// We are on the last byte, we should receive a NACK at the end of this byte
+      returnStatus = receiveByte(0);
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_NACK) { return(I2C_STATUS_NACK_UNRECEIVED); }
+    }
+    else
+    {// We haven't reached the last byte, so we should expect an ACK bit at the end of this byte
+      returnStatus = receiveByte(1);
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_ACK) { return(I2C_STATUS_ACK_UNRECEIVED); }
+    }
+    data[i] = TWDR;
+    bytesAvailable = i + 1;
+    totalBytes = i + 1;
+  }
+  returnStatus = stop();
+  if (returnStatus != TWSR_STATUS_STOPPED)
+  {
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
+    else { return(I2C_STATUS_UNKNOWN); }
+  }
+  return(I2C_STATUS_OK);
+}
+
+I2C_STATUS I2C::read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer)
+{
+  bytesAvailable = 0;
+  bufferIndex = 0;
+  if (numberBytes == 0) { numberBytes++; }
+  nack = numberBytes - 1;
+  returnStatus = 0;
+  returnStatus = start();
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
+  returnStatus = sendAddress(SLA_R(address));
+  if (returnStatus != TWSR_STATUS_ACK)
+  {
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   for (uint8_t i = 0; i < numberBytes; i++)
@@ -415,24 +464,23 @@ I2C_STATUS I2C::read(uint8_t address, uint8_t numberBytes)
     if (i == nack)
     {
       returnStatus = receiveByte(0);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-
-      if (returnStatus != MR_DATA_NACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_NACK) { return(I2C_STATUS_NACK_UNRECEIVED); }
     }
     else
     {
       returnStatus = receiveByte(1);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_ACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_ACK) { return(I2C_STATUS_ACK_UNRECEIVED); }
     }
-    data[i] = TWDR;
+    dataBuffer[i] = TWDR;
     bytesAvailable = i + 1;
     totalBytes = i + 1;
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -451,95 +499,55 @@ I2C_STATUS I2C::read(uint8_t address, uint8_t registerAddress, uint8_t numberByt
   nack = numberBytes - 1;
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(registerAddress);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = start();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STARTED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_REPSTART); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REPSTART_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendAddress(SLA_R(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   for (uint8_t i = 0; i < numberBytes; i++)
   {
     if (i == nack)
-    {
+    {// We are on the last byte, we should receive a NACK at the end of this byte
       returnStatus = receiveByte(0);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_NACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_NACK) { return(I2C_STATUS_NACK_UNRECEIVED); }
     }
     else
-    {
+    {// We haven't reached the last byte, so we should expect an ACK bit at the end of this byte
       returnStatus = receiveByte(1);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_ACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_ACK) { return(I2C_STATUS_ACK_UNRECEIVED); }
     }
     data[i] = TWDR;
     bytesAvailable = i + 1;
     totalBytes = i + 1;
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
-    else { return(I2C_STATUS_UNKNOWN); }
-  }
-  return(I2C_STATUS_OK);
-}
-
-I2C_STATUS I2C::read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer)
-{
-  bytesAvailable = 0;
-  bufferIndex = 0;
-  if (numberBytes == 0) { numberBytes++; }
-  nack = numberBytes - 1;
-  returnStatus = 0;
-  returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
-  returnStatus = sendAddress(SLA_R(address));
-  if (returnStatus)
-  {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_ADD); }
-    else { return(I2C_STATUS_UNKNOWN); }
-  }
-  for (uint8_t i = 0; i < numberBytes; i++)
-  {
-    if (i == nack)
-    {
-      returnStatus = receiveByte(0);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_NACK) { return(I2C_STATUS_UNKNOWN); }
-    }
-    else
-    {
-      returnStatus = receiveByte(1);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_ACK) { return(I2C_STATUS_UNKNOWN); }
-    }
-    dataBuffer[i] = TWDR;
-    bytesAvailable = i + 1;
-    totalBytes = i + 1;
-  }
-  returnStatus = stop();
-  if (returnStatus)
-  {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -553,29 +561,31 @@ I2C_STATUS I2C::read(uint8_t address, uint8_t registerAddress, uint8_t numberByt
   nack = numberBytes - 1;
   returnStatus = 0;
   returnStatus = start();
-  if (returnStatus) { return(I2C_STATUS_START); }
+  if (returnStatus != TWSR_STATUS_STARTED) { return(I2C_STATUS_START_TIMEOUT); }
   returnStatus = sendAddress(SLA_W(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendByte(registerAddress);
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_TRS_DAT); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_TRS_DAT_ACKNACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = start();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STARTED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_REPSTART); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REPSTART_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   returnStatus = sendAddress(SLA_R(address));
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_ACK)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_ADD); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_ADDRESS_TIMEOUT); }
+    else if (returnStatus == TWSR_STATUS_NACK) { return(I2C_STATUS_ADDRESS_NACK); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   for (uint8_t i = 0; i < numberBytes; i++)
@@ -583,23 +593,23 @@ I2C_STATUS I2C::read(uint8_t address, uint8_t registerAddress, uint8_t numberByt
     if (i == nack)
     {
       returnStatus = receiveByte(0);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_NACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_NACK) { return(I2C_STATUS_NACK_UNRECEIVED); }
     }
     else
     {
       returnStatus = receiveByte(1);
-      if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_ACKNACK_REC_DAT); }
-      if (returnStatus != MR_DATA_ACK) { return(I2C_STATUS_UNKNOWN); }
+      if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_REC_DAT_ACKNACK); }
+      if (returnStatus != TWSR_STATUS_ACK) { return(I2C_STATUS_ACK_UNRECEIVED); }
     }
     dataBuffer[i] = TWDR;
     bytesAvailable = i + 1;
     totalBytes = i + 1;
   }
   returnStatus = stop();
-  if (returnStatus)
+  if (returnStatus != TWSR_STATUS_STOPPED)
   {
-    if (returnStatus == TWI_STATUS_TIMEOUT) { return(I2C_STATUS_STOP); }
+    if (returnStatus == TWSR_STATUS_TIMEOUT) { return(I2C_STATUS_STOP_TIMEOUT); }
     else { return(I2C_STATUS_UNKNOWN); }
   }
   return(I2C_STATUS_OK);
@@ -618,22 +628,21 @@ uint8_t I2C::start()
     if (!timeOutDelay) { continue; }
     if ((millis() - startingTime) >= timeOutDelay)
     {
-      lockUp();
-      return(TWI_STATUS_TIMEOUT);
+      resetI2CBus();
+      return(TWSR_STATUS_TIMEOUT);
     }
 
   }
   if ((TWI_STATUS == START) || (TWI_STATUS == REPEATED_START))
   {
-    return(TWI_STATUS_ACK);
+    return(TWSR_STATUS_STARTED);
   }
   if (TWI_STATUS == LOST_ARBTRTN)
   {
-    uint8_t bufferedStatus = TWI_STATUS;
-    lockUp();
-    return(bufferedStatus);
+    resetI2CBus();
+    return(TWSR_STATUS_LOSTARB);
   }
-  return(TWI_STATUS);
+  return(TWSR_STATUS_UNKNOWN);
 }
 
 uint8_t I2C::sendAddress(uint8_t i2cAddress)
@@ -647,28 +656,27 @@ uint8_t I2C::sendAddress(uint8_t i2cAddress)
     if ((millis() - startingTime) >= timeOutDelay)
     {
       // Time out error
-      lockUp();
-      return(TWI_STATUS_TIMEOUT);
+      resetI2CBus();
+      return(TWSR_STATUS_TIMEOUT);
     }
-
   }
   if ((TWI_STATUS == MT_SLA_ACK) || (TWI_STATUS == MR_SLA_ACK))
   {
     // I2C comm completed successfully with ACK bit received
-    return(TWI_STATUS_ACK);
+    return(TWSR_STATUS_ACK);
   }
   uint8_t bufferedStatus = TWI_STATUS;
   if ((TWI_STATUS == MT_SLA_NACK) || (TWI_STATUS == MR_SLA_NACK))
   {
     // I2C comm completed, but with a NACK bit
     stop();
-    return(bufferedStatus);
+    return(TWSR_STATUS_NACK);
   }
   else
   {
     // Unknown error
-    lockUp();
-    return(bufferedStatus);
+    resetI2CBus();
+    return(TWSR_STATUS_UNKNOWN);
   }
 }
 
@@ -682,25 +690,24 @@ uint8_t I2C::sendByte(uint8_t i2cData)
     if (!timeOutDelay) { continue; }
     if ((millis() - startingTime) >= timeOutDelay)
     {
-      lockUp();
-      return(TWI_STATUS_TIMEOUT);
+      resetI2CBus();
+      return(TWSR_STATUS_TIMEOUT);
     }
-
   }
   if (TWI_STATUS == MT_DATA_ACK)
   {
-    return(TWI_STATUS_ACK);
+    return(TWSR_STATUS_ACK);
   }
   uint8_t bufferedStatus = TWI_STATUS;
   if (TWI_STATUS == MT_DATA_NACK)
   {
     stop();
-    return(bufferedStatus);
+    return(TWSR_STATUS_NACK);
   }
   else
   {
-    lockUp();
-    return(bufferedStatus);
+    resetI2CBus();
+    return(TWSR_STATUS_UNKNOWN);
   }
 }
 
@@ -721,17 +728,24 @@ uint8_t I2C::receiveByte(uint8_t ack)
     if (!timeOutDelay) { continue; }
     if ((millis() - startingTime) >= timeOutDelay)
     {
-      lockUp();
-      return(TWI_STATUS_TIMEOUT);
+      resetI2CBus();
+      return(TWSR_STATUS_TIMEOUT);
     }
+  }
+  if (TWI_STATUS == MR_DATA_ACK)
+  {
+    return(TWSR_STATUS_ACK);
+  }
+  if (TWI_STATUS == MR_DATA_NACK)
+  {
+    return(TWSR_STATUS_NACK);
   }
   if (TWI_STATUS == LOST_ARBTRTN)
   {
-    uint8_t bufferedStatus = TWI_STATUS;
-    lockUp();
-    return(bufferedStatus);
+    resetI2CBus();
+    return(TWSR_STATUS_LOSTARB);
   }
-  return(TWI_STATUS);
+  return(TWSR_STATUS_UNKNOWN);
 }
 
 uint8_t I2C::stop()
@@ -743,15 +757,15 @@ uint8_t I2C::stop()
     if (!timeOutDelay) { continue; }
     if ((millis() - startingTime) >= timeOutDelay)
     {
-      lockUp();
-      return(TWI_STATUS_TIMEOUT);
+      resetI2CBus();
+      return(TWSR_STATUS_TIMEOUT);
     }
-
   }
-  return(TWI_STATUS_ACK);
+  return(TWSR_STATUS_STOPPED);
 }
 
-void I2C::lockUp()
+// Resets the I2C bus. This helps to solve a "stuck" I2C bus due to failure of arbitration.
+void I2C::resetI2CBus()
 {
   TWCR = 0; //releases SDA and SCL lines to high impedance
   TWCR = _BV(TWEN) | _BV(TWEA); //reinitialize TWI 
