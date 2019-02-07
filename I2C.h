@@ -75,16 +75,18 @@ Modified by Soon Kiat Lau (2017) for:
 
 #define START           0x08
 #define REPEATED_START  0x10
-#define MT_SLA_ACK	0x18
-#define MT_SLA_NACK	0x20
-#define MT_DATA_ACK     0x28
+#define MT_SLA_ACK	    0x18  // The "T" in MT stands for transmit
+#define MT_SLA_NACK	    0x20  // SLA indicates we are sending/receiving the address byte. So MT_SLA_*** are statuses returned when sending out addresses to find a slave device.
+#define MT_DATA_ACK     0x28  // DATA indicates we are sending/receiving the data byte(s). So MT_DATA_*** are statuses returned when sending out data to a slave device.
 #define MT_DATA_NACK    0x30
-#define MR_SLA_ACK	0x40
-#define MR_SLA_NACK	0x48
+#define MR_SLA_ACK	    0x40  // The "R" in MR stands for receive. The SLA and DATA means the same things as explained above.
+#define MR_SLA_NACK	    0x48
 #define MR_DATA_ACK     0x50
 #define MR_DATA_NACK    0x58
 #define LOST_ARBTRTN    0x38
 #define TWI_STATUS      (TWSR & 0xF8)
+#define TWI_STATUS_ACK      0x00  // I2C comm completed successfully (received ACK bit)
+#define TWI_STATUS_TIMEOUT  0x01  // I2C comm failed because it took too long to receive a complete response
 #define SLA_W(address)  (address << 1)
 #define SLA_R(address)  ((address << 1) + 0x01)
 #define cbi(sfr, bit)   (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -92,22 +94,24 @@ Modified by Soon Kiat Lau (2017) for:
 
 #define MAX_BUFFER_SIZE 32
 
-// Error codes
+// Error codes returned by read/write functions
 typedef enum
 {
   // Errors categorized according to the functions that return them. Commented-out errors are still returned
   // by that function, but is already defined in the list.
 
   // Errors returned from the custom I2C library
-  I2C_STATUS_OK = 0,   // No problemo
-  I2C_STATUS_START = 1,   // I2C timeout while waiting for successful completion of a Start bit
-  I2C_STATUS_ACKNACK_MODE = 2,   // I2C timeout while waiting for ACK/NACK while addressing slave in transmit mode (MT)
-  I2C_STATUS_ACKNACK = 3,   // I2C timeout while waiting for ACK/NACK while sending data to the slave
-  I2C_STATUS_REPSTART = 4,   // I2C timeout while waiting for successful completion of a Repeated Start
-  I2C_STATUS_ACKNACK_RECMODE = 5,   // I2C timeout while waiting for ACK/NACK while addressing slave in receiver mode (MR)
-  I2C_STATUS_ACKNACK_REC = 6,   // I2C timeout while waiting for ACK/NACK while receiving data from the slave
-  I2C_STATUS_STOP = 7,   // I2C timeout while waiting for successful completion of the Stop bit
-  I2C_STATUS_OTHER = 8,   // "See datasheet [of microcontroller chip] for exact meaning"
+  I2C_STATUS_OK               = 0,   // No problemo
+  I2C_STATUS_START            = 1,   // I2C timeout while waiting for successful completion of a Start bit
+  I2C_STATUS_ACKNACK_TRS_ADD  = 2,   // I2C timeout while waiting for ACK/NACK while addressing slave in transmit mode (MT)
+  I2C_STATUS_ACKNACK_TRS_DAT  = 3,   // I2C timeout while waiting for ACK/NACK while sending data to the slave
+  I2C_STATUS_REPSTART         = 4,   // I2C timeout while waiting for successful completion of a Repeated Start
+  I2C_STATUS_ACKNACK_REC_ADD  = 5,   // I2C timeout while waiting for ACK/NACK while addressing slave in receiver mode (MR)
+  I2C_STATUS_ACKNACK_REC_DAT  = 6,   // I2C timeout while waiting for ACK/NACK while receiving data from the slave
+  I2C_STATUS_STOP             = 7,   // I2C timeout while waiting for successful completion of the Stop bit
+  I2C_STATUS_UNKNOWN          = 8,   // Unknown or yet to be defined error
+
+  // Internal use by this library only; do not use this outside of the library
 } I2C_STATUS;
 
 class I2C
@@ -122,19 +126,19 @@ public:
   void scan();
   uint8_t available();
   uint8_t receive();
-  uint8_t ping(uint8_t);  // ADDED: Simply send a write request to the device without any additional bytes. This is sometimes used to trigger a device.
-  uint8_t write(uint8_t address, uint8_t registerAddress);
-  uint8_t write(int address, int registerAddress);
-  uint8_t write(uint8_t address, uint8_t registerAddress, uint8_t data);
-  uint8_t write(int address, int registerAddress, int data);
-  uint8_t write(uint8_t address, uint8_t registerAddress, char *data);
-  uint8_t write(uint8_t address, uint8_t registerAddress, uint8_t *data, uint8_t numberBytes);
-  uint8_t read(uint8_t address, uint8_t numberBytes);
-  uint8_t read(int address, int numberBytes);
-  uint8_t read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes);
-  uint8_t read(int address, int registerAddress, int numberBytes);
-  uint8_t read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer);
-  uint8_t read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes, uint8_t *dataBuffer);
+  I2C_STATUS ping(uint8_t);  // ADDED: Simply send a write request to the device without any additional bytes. This is sometimes used to trigger a device.
+  I2C_STATUS write(uint8_t address, uint8_t registerAddress);
+  I2C_STATUS write(int address, int registerAddress);
+  I2C_STATUS write(uint8_t address, uint8_t registerAddress, uint8_t data);
+  I2C_STATUS write(int address, int registerAddress, int data);
+  I2C_STATUS write(uint8_t address, uint8_t registerAddress, char *data);
+  I2C_STATUS write(uint8_t address, uint8_t registerAddress, uint8_t *data, uint8_t numberBytes);
+  I2C_STATUS read(uint8_t address, uint8_t numberBytes);
+  I2C_STATUS read(int address, int numberBytes);
+  I2C_STATUS read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes);
+  I2C_STATUS read(int address, int registerAddress, int numberBytes);
+  I2C_STATUS read(uint8_t address, uint8_t numberBytes, uint8_t *dataBuffer);
+  I2C_STATUS read(uint8_t address, uint8_t registerAddress, uint8_t numberBytes, uint8_t *dataBuffer);
 
 
 private:
