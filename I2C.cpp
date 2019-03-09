@@ -571,13 +571,13 @@ I2C_STATUS I2C::transmit(uint8_t dataByte)
   }
 }
 
-I2C_STATUS I2C::receive(uint8_t needACK)
+I2C_STATUS I2C::receive(bool sendACK)
 {
-  if (needACK)
+  if (sendACK)
   {
     TWSRStatus_ = receiveByte(true);
 
-    if (returnStatus_ != TWSR_STATUS_ACK)
+    if (TWSRStatus_ != TWSR_STATUS_ACK)
     {
       switch (TWSRStatus_)
       {
@@ -603,7 +603,7 @@ I2C_STATUS I2C::receive(uint8_t needACK)
   {
     TWSRStatus_ = receiveByte(false);
 
-    if (returnStatus_ != TWSR_STATUS_ACK)
+    if (TWSRStatus_ != TWSR_STATUS_NACK)
     {
       switch (TWSRStatus_)
       {
@@ -737,10 +737,10 @@ TWSR_STATUS I2C::sendByte(uint8_t i2cData)
   }
 }
 
-TWSR_STATUS I2C::receiveByte(bool needACK)
+TWSR_STATUS I2C::receiveByte(bool sendACK)
 {
   unsigned long startingTime = millis();
-  if (needACK)
+  if (sendACK)
   {
     TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWEA);
 

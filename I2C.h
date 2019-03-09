@@ -73,18 +73,22 @@ Modified by Soon Kiat Lau (2019):
 #ifndef I2C_h
 #define I2C_h
 
-
 #define START           0x08
 #define REPEATED_START  0x10
-#define MT_SLA_ACK	    0x18  // The "T" in MT stands for transmit
-#define MT_SLA_NACK	    0x20  // SLA indicates we are sending/receiving the address byte. So MT_SLA_*** are statuses returned when sending out addresses to find a slave device.
-#define MT_DATA_ACK     0x28  // DATA indicates we are sending/receiving the data byte(s). So MT_DATA_*** are statuses returned when sending out data to a slave device.
-#define MT_DATA_NACK    0x30
-#define MR_SLA_ACK	    0x40  // The "R" in MR stands for receive. The SLA and DATA means the same things as explained above.
-#define MR_SLA_NACK	    0x48
-#define MR_DATA_ACK     0x50
-#define MR_DATA_NACK    0x58
-#define LOST_ARBTRTN    0x38
+
+// See https://www.microchip.com/webdoc/AVRLibcReferenceManual/ch20s33s01.html for status code definitions.
+// The "T" in MT stands for transmit. The "R" in MR stands for receive.
+// SLA indicates we are sending/receiving the address byte. So MT_SLA_*** are statuses returned when sending out addresses to find a slave device.
+// DATA indicates we are sending/receiving the data byte(s). So MT_DATA_*** are statuses returned when sending out data to a slave device.
+#define MT_SLA_ACK	    0x18  // SLA+W transmitted, ACK received
+#define MT_SLA_NACK	    0x20  // SLA+W transmitted, NACK received
+#define MT_DATA_ACK     0x28  // data transmitted, ACK received
+#define MT_DATA_NACK    0x30  // data transmitted, NACK received
+#define MR_SLA_ACK	    0x40  // SLA+R transmitted, ACK received
+#define MR_SLA_NACK	    0x48  // SLA+R transmitted, NACK received
+#define MR_DATA_ACK     0x50  // data received, ACK returned
+#define MR_DATA_NACK    0x58  // data received, NACK returned
+#define LOST_ARBTRTN    0x38  // arbitration lost in (SLA+W or data), or (SLA+R or NACK)
 #define TWI_STATUS      (TWSR & 0xF8)
 #define SLA_W(address)  (address << 1)
 #define SLA_R(address)  ((address << 1) + 0x01)
@@ -175,14 +179,14 @@ public:
   // Abstractions of some of the private functions to return the appropriate I2C_STATUS
   I2C_STATUS beginTransmission(uint8_t address, bool write, bool repeatedStart);
   I2C_STATUS transmit(uint8_t dataByte);
-  I2C_STATUS receive(uint8_t needACK);
+  I2C_STATUS receive(bool sendACK);
   I2C_STATUS endTransmission();
 
 private:
   TWSR_STATUS start();
   TWSR_STATUS sendAddress(uint8_t address);
   TWSR_STATUS sendByte(uint8_t byte);
-  TWSR_STATUS receiveByte(bool needACK);
+  TWSR_STATUS receiveByte(bool sendACK);
   TWSR_STATUS stop();
   void resetI2CBus();
 
