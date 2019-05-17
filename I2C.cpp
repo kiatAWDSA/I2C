@@ -65,7 +65,6 @@ Modified by Soon Kiat Lau (2019) for:
 uint8_t I2C::bytesAvailable_ = 0;
 uint8_t I2C::bufferIndex_ = 0;
 uint8_t I2C::totalBytes_ = 0;
-uint16_t I2C::timeOutDelay_ = 0;
 
 I2C::I2C()
 {
@@ -82,35 +81,8 @@ I2C::I2C()
 // pulled fully to GND due to the internal pull-ups.
 void I2C::begin(bool enableInternalPullUps)
 {
-  if (enableInternalPullUps)
-  {
-    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega328P__)
-        // activate internal pull-ups for twi
-        // as per note from atmega8 manual pg167
-        sbi(PORTC, 4);
-        sbi(PORTC, 5);
-    #else
-        // activate internal pull-ups for twi
-        // as per note from atmega128 manual pg66 and 203
-        sbi(PORTD, 0);
-        sbi(PORTD, 1);
-    #endif
-  }
-  else
-  {
-    // Disable pull-ups. Copied from pullup() function
-    #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega328P__)
-        // deactivate internal pull-ups for twi
-        // as per note from atmega8 manual pg167
-        cbi(PORTC, 4);
-        cbi(PORTC, 5);
-    #else
-        // deactivate internal pull-ups for twi
-        // as per note from atmega128 manual pg66 and 203
-        cbi(PORTD, 0);
-        cbi(PORTD, 1);
-    #endif
-  }
+  enableInternalPullUps_ = enableInternalPullUps;
+  pullup(enableInternalPullUps);
 
   // initialize twi prescaler and bit rate
   cbi(TWSR, TWPS0);
@@ -129,12 +101,14 @@ void I2C::end()
 
 void I2C::setTimeOut(uint16_t timeOut)
 {
-  timeOutDelay_ = timeOut;
+  timeOut_ = timeOut;
 }
 
 // Call setSpeed AFTER begin(), because begin() sets speed to 100 kHz
 void I2C::setSpeed(bool useFastMode)
 {
+  useFastMode_ = useFastMode;
+
   if (!useFastMode)
   {
     // 100 kHz
@@ -181,7 +155,7 @@ void I2C::pullup(bool activate)
 
 void I2C::scan()
 {
-  uint16_t tempTime = timeOutDelay_;
+  uint16_t tempTime = timeOut_;
   setTimeOut(80);
   uint8_t totalDevicesFound = 0;
   Serial.println("Scanning for devices...please wait");
@@ -197,7 +171,7 @@ void I2C::scan()
       {// Will receive a NACK if a device has the address, but is unable to communicate now. Therefore, that is not a problem with the I2C bus.
         // Other errors indicate there is a problem with the bus.
         Serial.println("There is a problem with the bus, could not complete scan");
-        timeOutDelay_ = tempTime;
+        timeOut_ = tempTime;
         return;
       }
     }
@@ -211,7 +185,7 @@ void I2C::scan()
     stop();
   }
   if (!totalDevicesFound) { Serial.println("No devices found"); }
-  timeOutDelay_ = tempTime;
+  timeOut_ = tempTime;
 }
 
 
@@ -651,8 +625,8 @@ TWSR_STATUS I2C::start()
   TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
   while (!(TWCR & (1 << TWINT)))
   {
-    if (!timeOutDelay_) { continue; }
-    if ((millis() - startingTime) >= timeOutDelay_)
+    if (!timeOut_) { continue; }
+    if ((millis() - startingTime) >= timeOut_)
     {
       resetI2CBus();
       return(TWSR_STATUS_TIMEOUT);
@@ -678,8 +652,8 @@ TWSR_STATUS I2C::sendAddress(uint8_t i2cAddress)
   TWCR = (1 << TWINT) | (1 << TWEN);
   while (!(TWCR & (1 << TWINT)))
   {
-    if (!timeOutDelay_) { continue; }
-    if ((millis() - startingTime) >= timeOutDelay_)
+    if (!timeOut_) { continue; }
+    if ((millis() - startingTime) >= timeOut_)
     {
       // Time out error
       resetI2CBus();
@@ -713,8 +687,8 @@ TWSR_STATUS I2C::sendByte(uint8_t i2cData)
   TWCR = (1 << TWINT) | (1 << TWEN);
   while (!(TWCR & (1 << TWINT)))
   {
-    if (!timeOutDelay_) { continue; }
-    if ((millis() - startingTime) >= timeOutDelay_)
+    if (!timeOut_) { continue; }
+    if ((millis() - startingTime) >= timeOut_)
     {
       resetI2CBus();
       return(TWSR_STATUS_TIMEOUT);
@@ -751,8 +725,8 @@ TWSR_STATUS I2C::receiveByte(bool sendACK)
   }
   while (!(TWCR & (1 << TWINT)))
   {
-    if (!timeOutDelay_) { continue; }
-    if ((millis() - startingTime) >= timeOutDelay_)
+    if (!timeOut_) { continue; }
+    if ((millis() - startingTime) >= timeOut_)
     {
       resetI2CBus();
       return(TWSR_STATUS_TIMEOUT);
@@ -780,8 +754,8 @@ TWSR_STATUS I2C::stop()
   TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO);
   while ((TWCR & (1 << TWSTO)))
   {
-    if (!timeOutDelay_) { continue; }
-    if ((millis() - startingTime) >= timeOutDelay_)
+    if (!timeOut_) { continue; }
+    if ((millis() - startingTime) >= timeOut_)
     {
       resetI2CBus();
       return(TWSR_STATUS_TIMEOUT);
@@ -794,7 +768,10 @@ TWSR_STATUS I2C::stop()
 void I2C::resetI2CBus()
 {
   TWCR = 0; //releases SDA and SCL lines to high impedance
-  TWCR = _BV(TWEN) | _BV(TWEA); //reinitialize TWI 
+
+  // Re-initialize the I2C bus.
+  begin(enableInternalPullUps_);
+  setSpeed(useFastMode_);
 }
 
 I2C I2c = I2C();

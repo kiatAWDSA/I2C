@@ -139,6 +139,8 @@ public:
   void setSpeed(bool useFastMode);
   void pullup(bool activate);
   void scan();
+
+  // Functions for obtaining the received data.
   uint8_t available();
   uint8_t getByte();
 
@@ -176,7 +178,8 @@ public:
   I2C_STATUS read(uint8_t   address,  uint8_t registerAddress,  uint8_t numberBytes);
   I2C_STATUS read(int       address,  int     registerAddress,  int     numberBytes);
 
-  // Abstractions of some of the private functions to return the appropriate I2C_STATUS
+  // Abstractions of some of the private functions to return the appropriate I2C_STATUS.
+  // Use the write/read functions instead of these functions unless you really have to.
   I2C_STATUS beginTransmission(uint8_t address, bool write, bool repeatedStart);
   I2C_STATUS transmit(uint8_t dataByte);
   I2C_STATUS receive(bool sendACK);
@@ -197,7 +200,11 @@ private:
   static uint8_t bytesAvailable_;
   static uint8_t bufferIndex_;
   static uint8_t totalBytes_;
-  static uint16_t timeOutDelay_;
+
+  // Configuration of the I2C bus.
+  bool enableInternalPullUps_;
+  bool useFastMode_;
+  uint16_t timeOut_;
 };
 
 extern I2C I2c;
